@@ -1,7 +1,3 @@
-# Custom
-deps/
-examples/*/data/
-
 # IDEs / editors
 .idea/
 .vscode/
