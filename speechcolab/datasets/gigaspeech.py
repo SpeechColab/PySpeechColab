@@ -15,9 +15,7 @@ class GigaSpeech(object):
             f'subset {subset} not in {self.allowed_subsets}'
 
         # TODO: download the data
-        pass
-
-        assert self.json_path.is_file()
+        raise NotImplementedError
 
     def audios(self, subset='{XL}'):
         """
