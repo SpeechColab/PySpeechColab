@@ -1,4 +1,3 @@
-import os
 import pytest
 
 from speechcolab.datasets import gigaspeech
