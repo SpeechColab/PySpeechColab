@@ -7,7 +7,7 @@ class GigaSpeech(object):
     def __init__(self, path='.'):
         self.root_path = Path(path)
         self.json_path = self.root_path / 'GigaSpeech.json'
-        self.allowed_subsets = ('{XS}', '{S}', '{M}', '{L}', '{XL}')
+        self.allowed_subsets = ('{XS}', '{S}', '{M}', '{L}', '{XL}', '{DEV}', '{TEST}')
 
     def download(self, subset='{XL}'):
         self.root_path.mkdir(parents=True, exist_ok=True)
