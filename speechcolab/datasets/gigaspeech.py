@@ -33,6 +33,8 @@ class GigaSpeech(object):
             audios = ijson.items(f, 'audios.item')
             for audio in audios:
                 if subset in audio['subsets']:
+                    # We are filtering out the segments that do not belong to the requested subset
+                    audio['segments'] = [s for s in audio['segments'] if subset in s['subsets']]
                     yield audio
 
     def segments(self, subset='{XL}'):
