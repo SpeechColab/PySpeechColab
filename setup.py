@@ -10,7 +10,7 @@ extras_require['dev'] = extras_require['test']
 
 setup(
     name='speechcolab',
-    version='0.0.1-alpha',
+    version='0.0.2-alpha',
     python_requires='>=3.6.0',
     description='A library of speech gadgets.',
     author='The SpeechColab Development Team',
