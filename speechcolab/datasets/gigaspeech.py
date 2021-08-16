@@ -107,11 +107,13 @@ class GigaSpeech(object):
             if local_md5 == remote_md5:
                 print(f'Skipping {local_obj}, successfully retrieved already.')
                 need_download = False
+            else:
+              print(f'{local_obj} corrupted or out-of-date, start to re-download.')
 
         if need_download:
-            print(f'{local_obj} corrupted or out-of-date, start to re-download.')
             local_obj.parent.mkdir(parents=True, exist_ok=True)
             http = urllib3.PoolManager()
+            print(f'Downloading from {remote_obj}')
             response = http.request('GET', remote_obj)
             data = response.data
 
