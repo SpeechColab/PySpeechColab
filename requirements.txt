@@ -1,3 +1,4 @@
 ijson
 urllib3
 pyyaml
+pycryptodome

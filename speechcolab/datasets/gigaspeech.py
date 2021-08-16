@@ -1,10 +1,15 @@
+import gzip
 import hashlib
+import io
+import tarfile
 import time
+from hashlib import pbkdf2_hmac
 from pathlib import Path
 
 import ijson
 import urllib3
 import yaml
+from Crypto.Cipher import AES
 
 url_of_host = {
     'oss': 'oss://speechcolab/GigaSpeech/release/GigaSpeech',
@@ -30,6 +35,14 @@ class GigaSpeech(object):
             host='tsinghua',
             with_dict=False
     ):
+        """
+        Download and extract the dataset files.
+
+        :param password: string, the password issued by GigaSpeech.
+        :param subset: string, the subset name.
+        :param host: string, hostname, which should be in ('tsinghua', 'speechocean', 'magicdata').
+        :param with_dict: bool, whether to download the dict.
+        """
         assert subset in allowed_subsets, \
             f'subset {subset} not in {allowed_subsets}'
 
@@ -68,8 +81,7 @@ class GigaSpeech(object):
         def prepare_objects_from_release(category):
             assert category in aes_list, f'No entry for {category} found in files.yaml'
             for path in aes_list[category]:
-                self.download_object_from_release(aes_list[category][path], path)
-                self.process_downloaded_object(path)
+                self.download_and_process_object_from_release(aes_list[category][path], path)
 
         # Download metadata
         prepare_objects_from_release('metadata')
@@ -82,41 +94,49 @@ class GigaSpeech(object):
         if with_dict:
             prepare_objects_from_release('dict')
 
-    def download_object_from_release(self, remote_md5, obj):
+    def download_and_process_object_from_release(self, remote_md5, obj):
+        # Download
         remote_obj = f'{self.gigaspeech_release_url}/{obj}'
         local_obj = self.gigaspeech_dataset_dir / obj
-
+        need_download = True
+        data = ''
         if local_obj.exists():
             with open(local_obj, 'rb') as f:
                 data = f.read()
                 local_md5 = hashlib.md5(data).hexdigest()
             if local_md5 == remote_md5:
                 print(f'Skipping {local_obj}, successfully retrieved already.')
-                return
-            else:
-                print(f'{local_obj} corrupted or out-of-date, start to re-download.')
+                need_download = False
 
-        local_obj.parent.mkdir(parents=True, exist_ok=True)
-        http = urllib3.PoolManager()
-        response = http.request('GET', remote_obj)
-        with open(local_obj, 'wb') as f:
-            f.write(response.data)
+        if need_download:
+            print(f'{local_obj} corrupted or out-of-date, start to re-download.')
+            local_obj.parent.mkdir(parents=True, exist_ok=True)
+            http = urllib3.PoolManager()
+            response = http.request('GET', remote_obj)
+            data = response.data
 
-    def process_downloaded_object(self, obj):
-        path = self.gigaspeech_dataset_dir / obj
-        location = path.parent
-        assert path.suffix == '.aes'
-        with open(path, 'rb') as f:
-            data = f.read()
-            # TODO: decrypt
+        # Decrypt
+        bs = AES.block_size
+        salt = data[:bs][len('Salted__'):]
+        key_length = 32
+        d = pbkdf2_hmac('sha256', self.password.encode(), salt, 10000, key_length + bs)
+        key, iv = d[:key_length], d[key_length:key_length + bs]
+        cipher = AES.new(key, AES.MODE_CBC, iv)
+        data_dec = cipher.decrypt(data[bs:])
 
-        if path.suffixes == ['.tgz', '.aes']:
+        # Write to disk
+        io_bytes = io.BytesIO(data_dec)
+        if local_obj.suffixes == ['.tgz', '.aes']:
             # encrypted-gziped-tarball contains contents of a GigaSpeech sub-directory
-            subdir = location / Path(path.stem.strip('.tgz'))
+            subdir = local_obj.parent / Path(local_obj.stem.strip('.tgz'))
             subdir.mkdir(parents=True, exist_ok=True)
-        elif path.suffixes == ['.gz', '.aes']:
+            with tarfile.open(fileobj=io_bytes, mode='r') as tar:
+                tar.extractall(path=subdir)
+        elif local_obj.suffixes == ['.gz', '.aes']:
             # encripted-gziped object represents a regular GigaSpeech file
-            pass
+            out_path = Path(local_obj.stem.strip('.gz.aes'))
+            with gzip.open(io_bytes, 'rb') as gz, open(out_path, 'wb') as f:
+                f.write(gz.read())
         else:
             # keep the object as it is
             pass
