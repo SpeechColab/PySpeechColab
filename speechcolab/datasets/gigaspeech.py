@@ -1,8 +1,8 @@
-import gzip
 import hashlib
 import io
 import tarfile
 import time
+import zlib
 from hashlib import pbkdf2_hmac
 from pathlib import Path
 
@@ -95,7 +95,7 @@ class GigaSpeech(object):
             prepare_objects_from_release('dict')
 
     def download_and_process_object_from_release(self, remote_md5, obj):
-        # Download
+        # Download the aes files
         remote_obj = f'{self.gigaspeech_release_url}/{obj}'
         local_obj = self.gigaspeech_dataset_dir / obj
         need_download = True
@@ -116,6 +116,8 @@ class GigaSpeech(object):
             print(f'Downloading from {remote_obj}')
             response = http.request('GET', remote_obj)
             data = response.data
+            with open(local_obj, 'wb') as f:
+                f.write(data)
 
         # Decrypt
         bs = AES.block_size
@@ -126,19 +128,18 @@ class GigaSpeech(object):
         cipher = AES.new(key, AES.MODE_CBC, iv)
         data_dec = cipher.decrypt(data[bs:])
 
-        # Write to disk
-        io_bytes = io.BytesIO(data_dec)
+        # Write the decompressed files
         if local_obj.suffixes == ['.tgz', '.aes']:
             # encrypted-gziped-tarball contains contents of a GigaSpeech sub-directory
             subdir = local_obj.parent / Path(local_obj.stem.strip('.tgz'))
             subdir.mkdir(parents=True, exist_ok=True)
-            with tarfile.open(fileobj=io_bytes, mode='r') as tar:
+            with tarfile.open(fileobj=io.BytesIO(data_dec), mode='r') as tar:
                 tar.extractall(path=subdir)
-        elif local_obj.suffixes == ['.gz', '.aes']:
+        elif local_obj.suffixes[-2:] == ['.gz', '.aes']:
             # encripted-gziped object represents a regular GigaSpeech file
-            out_path = Path(local_obj.stem.strip('.gz.aes'))
-            with gzip.open(io_bytes, 'rb') as gz, open(out_path, 'wb') as f:
-                f.write(gz.read())
+            out_path = local_obj.parent / Path(local_obj.stem.strip('.gz.aes'))
+            with open(out_path, 'wb') as f:
+                f.write(zlib.decompress(data_dec, zlib.MAX_WBITS|16))
         else:
             # keep the object as it is
             pass
