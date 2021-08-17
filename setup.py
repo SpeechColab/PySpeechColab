@@ -4,13 +4,9 @@ from setuptools import find_packages, setup
 
 project_root = Path(__file__).parent
 
-install_requires = (project_root / 'requirements.txt').read_text().splitlines()
-extras_require = {'test': ['pytest']}
-extras_require['dev'] = extras_require['test']
-
 setup(
     name='speechcolab',
-    version='0.0.1-alpha',
+    version='0.0.2-alpha',
     python_requires='>=3.6.0',
     description='A library of speech gadgets.',
     author='The SpeechColab Development Team',
@@ -18,8 +14,6 @@ setup(
     long_description_content_type="text/markdown",
     license='Apache-2.0 License',
     packages=find_packages(),
-    install_requires=install_requires,
-    extras_require=extras_require,
     classifiers=[
         "Development Status :: 3 - Alpha",
         "Programming Language :: Python :: 3.6",

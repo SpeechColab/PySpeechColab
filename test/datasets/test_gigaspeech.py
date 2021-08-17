@@ -10,13 +10,6 @@ def gigaspeech_data():
     return gigaspeech.GigaSpeech(target_dir)
 
 
-def test_gigaspeech_download(gigaspeech_data):
-    try:
-        gigaspeech_data.download()
-    except NotImplementedError:
-        pass
-
-
 def test_gigaspeech_audios(gigaspeech_data):
     for i, audio in enumerate(gigaspeech_data.audios('{XS}')):
         assert audio['source'] in ('podcast', 'audiobook', 'youtube')

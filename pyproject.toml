@@ -1,0 +1,10 @@
+[build-system]
+requires = [
+    "setuptools>=42",
+    "wheel",
+    "ijson",
+    "urllib3",
+    "pyyaml",
+    "pycryptodome"
+]
+build-backend = "setuptools.build_meta"
