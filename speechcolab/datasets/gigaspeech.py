@@ -108,9 +108,10 @@ class GigaSpeech(object):
                 print(f'Skipping {local_obj}, successfully retrieved already.')
                 need_download = False
             else:
-              print(f'{local_obj} corrupted or out-of-date, start to re-download.')
+                print(f'{local_obj} corrupted or out-of-date, start to re-download.')
 
-        if need_download:
+        retry_count = 3
+        while need_download and retry_count > 0:
             local_obj.parent.mkdir(parents=True, exist_ok=True)
             http = urllib3.PoolManager()
             print(f'Downloading from {remote_obj}')
@@ -118,6 +119,17 @@ class GigaSpeech(object):
             data = response.data
             with open(local_obj, 'wb') as f:
                 f.write(data)
+
+            # Check md5 of the written file
+            with open(local_obj, 'rb') as f:
+                data = f.read()
+                local_md5 = hashlib.md5(data).hexdigest()
+                if local_md5 == remote_md5:
+                    print(f'Successfully verified md5 for {local_obj}')
+                    need_download = False
+                else:
+                    print(f'$local_version expects md5=$md5, got $local_md5, try downloading')
+                    retry_count -= 1
 
         # Decrypt
         bs = AES.block_size
@@ -139,7 +151,7 @@ class GigaSpeech(object):
             # encripted-gziped object represents a regular GigaSpeech file
             out_path = local_obj.parent / Path(local_obj.stem.strip('.gz.aes'))
             with open(out_path, 'wb') as f:
-                f.write(zlib.decompress(data_dec, zlib.MAX_WBITS|16))
+                f.write(zlib.decompress(data_dec, zlib.MAX_WBITS | 16))
         else:
             # keep the object as it is
             pass
