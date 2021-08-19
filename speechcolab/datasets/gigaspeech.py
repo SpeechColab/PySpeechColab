@@ -131,7 +131,7 @@ class GigaSpeech(object):
                     print(f'$local_version expects md5=$md5, got $local_md5, try downloading')
                     retry_count -= 1
             if retry_count <= 0:
-                raise ConnectionError(f'Can not retrive the correct file {remote_obj} with md5 {local_md5}')
+                raise ConnectionError(f'Can not retrive the correct file {remote_obj} with md5 {remote_md5}')
 
         # Decrypt
         bs = AES.block_size
