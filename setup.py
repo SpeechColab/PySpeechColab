@@ -6,7 +6,7 @@ project_root = Path(__file__).parent
 
 setup(
     name='speechcolab',
-    version='0.0.2-alpha',
+    version='0.0.4-alpha',
     python_requires='>=3.6.0',
     description='A library of speech gadgets.',
     author='The SpeechColab Development Team',
@@ -14,6 +14,12 @@ setup(
     long_description_content_type="text/markdown",
     license='Apache-2.0 License',
     packages=find_packages(),
+    install_requires=[
+        "ijson",
+        "urllib3",
+        "pyyaml",
+        "pycryptodome"
+    ],
     classifiers=[
         "Development Status :: 3 - Alpha",
         "Programming Language :: Python :: 3.6",
