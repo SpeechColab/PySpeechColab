@@ -27,7 +27,7 @@ def download_from_ftp_to_buffer(host, remote_path, username=None, password=None,
         data.append(x)
 
     ftp.retrbinary('RETR ' + remote_path, callback=handle_binary)
-    return data[0]
+    return b''.join(data)
 
 
 def download_to_buffer(url):
