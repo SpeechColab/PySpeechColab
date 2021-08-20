@@ -1,5 +1,6 @@
 import hashlib
 import io
+import re
 import tarfile
 import time
 import zlib
@@ -111,7 +112,8 @@ class GigaSpeech(object):
         retry_count = 3
         while need_download and retry_count > 0:
             local_obj.parent.mkdir(parents=True, exist_ok=True)
-            print(f'Downloading from {remote_obj}')
+            remote_obj_for_print = re.sub(r'//.*@', '//', remote_obj)
+            print(f'Downloading from {remote_obj_for_print}')
             data = download_to_buffer(remote_obj)
             with open(local_obj, 'wb') as f:
                 f.write(data)
