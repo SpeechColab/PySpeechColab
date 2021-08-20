@@ -7,14 +7,15 @@ from hashlib import pbkdf2_hmac
 from pathlib import Path
 
 import ijson
-import urllib3
 import yaml
 from Crypto.Cipher import AES
+
+from speechcolab.utils.download import download_to_buffer
 
 url_of_host = {
     'oss': 'oss://speechcolab/GigaSpeech/release/GigaSpeech',
     'tsinghua': 'http://aidata.tsinghua-ieit.com/GigaSpeech',
-    'speechocean': 'ftp://124.207.81.184/GigaSpeech',
+    'speechocean': 'ftp://GigaSpeech:<PASSWORD>@124.207.81.184:21/GigaSpeech',
     'magicdata': 'https://freedata.oss-cn-beijing.aliyuncs.com/magichub/GigaSpeech'
 }
 
@@ -48,7 +49,7 @@ class GigaSpeech(object):
 
         if host not in url_of_host:
             raise NotImplementedError(f'Unknown host: {host}')
-        self.gigaspeech_release_url = url_of_host[host]
+        self.gigaspeech_release_url = url_of_host[host].replace('<PASSWORD>', password.replace('/', '<SLASH>'))
 
         if self.gigaspeech_release_url.startswith('oss:'):
             raise NotImplementedError('For downloading from OSS, please use: '
@@ -57,9 +58,7 @@ class GigaSpeech(object):
         self.password = password
 
         # User agreement
-        http = urllib3.PoolManager()
-        response = http.request('GET', f'{self.gigaspeech_release_url}/TERMS_OF_ACCESS')
-        access_term_text = response.data.decode()
+        access_term_text = download_to_buffer(f'{self.gigaspeech_release_url}/TERMS_OF_ACCESS').decode()
         self.gigaspeech_dataset_dir.mkdir(parents=True, exist_ok=True)
         with open(self.gigaspeech_dataset_dir / 'TERMS_OF_ACCESS', 'w') as f:
             f.write(access_term_text)
@@ -71,10 +70,9 @@ class GigaSpeech(object):
 
         # Download the file list
         filelist_path = self.gigaspeech_dataset_dir / 'files.yaml'
-        filelist_remote_url = f'{self.gigaspeech_release_url}/files.yaml'
-        response = http.request('GET', filelist_remote_url)
+        filelist_text = download_to_buffer(f'{self.gigaspeech_release_url}/files.yaml').decode()
         with open(filelist_path, 'w') as f:
-            f.write(response.data.decode())
+            f.write(filelist_text)
         with open(filelist_path) as f:
             aes_list = yaml.load(f, Loader=yaml.FullLoader)
 
@@ -113,10 +111,8 @@ class GigaSpeech(object):
         retry_count = 3
         while need_download and retry_count > 0:
             local_obj.parent.mkdir(parents=True, exist_ok=True)
-            http = urllib3.PoolManager()
             print(f'Downloading from {remote_obj}')
-            response = http.request('GET', remote_obj)
-            data = response.data
+            data = download_to_buffer(remote_obj)
             with open(local_obj, 'wb') as f:
                 f.write(data)
 

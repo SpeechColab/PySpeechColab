@@ -134,3 +134,6 @@ dmypy.json
 
 # For macOS
 .DS_Store
+
+# Debug
+debug.py
