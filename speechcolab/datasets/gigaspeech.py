@@ -29,6 +29,7 @@ class GigaSpeech(object):
         self.json_path = self.gigaspeech_dataset_dir / 'GigaSpeech.json'
         self.gigaspeech_release_url = ''
         self.password = ''
+        self.audios_in_subset = set()
 
     def download(
             self,
@@ -80,10 +81,18 @@ class GigaSpeech(object):
         def prepare_objects_from_release(category):
             assert category in aes_list, f'No entry for {category} found in files.yaml'
             for path in aes_list[category]:
+                if path.startswith('audio') and re.sub(r'\.tgz.*', '', path) not in self.audios_in_subset:
+                    continue
                 self.download_and_process_object_from_release(aes_list[category][path], path)
 
         # Download metadata
         prepare_objects_from_release('metadata')
+
+        # Decide which audios need to be downloaded
+        with open(self.json_path, 'rb') as f:
+            for audio in ijson.items(f, 'audios.item'):
+                if subset in audio['subsets']:
+                    self.audios_in_subset.add(f'{Path(audio["path"]).parent}')
 
         # Download audio
         for audio_source in ('youtube', 'podcast', 'audiobook'):
