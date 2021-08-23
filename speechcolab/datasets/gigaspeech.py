@@ -11,7 +11,7 @@ import ijson
 import yaml
 from Crypto.Cipher import AES
 
-from speechcolab.utils.download import download_to_buffer
+from speechcolab.utils.download import download
 
 url_of_host = {
     'oss': 'oss://speechcolab/GigaSpeech/release/GigaSpeech',
@@ -60,11 +60,11 @@ class GigaSpeech(object):
         self.password = password
 
         # User agreement
-        access_term_text = download_to_buffer(f'{self.gigaspeech_release_url}/TERMS_OF_ACCESS').decode()
         self.gigaspeech_dataset_dir.mkdir(parents=True, exist_ok=True)
-        with open(self.gigaspeech_dataset_dir / 'TERMS_OF_ACCESS', 'w') as f:
-            f.write(access_term_text)
-            print(access_term_text)
+        access_term_path = self.gigaspeech_dataset_dir / 'TERMS_OF_ACCESS'
+        download(access_term_path, f'{self.gigaspeech_release_url}/TERMS_OF_ACCESS')
+        with open(access_term_path, 'r') as f:
+            print(f.read())
         print('GigaSpeech downloading will start in 5 seconds')
         for t in range(5, 0, -1):
             print(t)
@@ -72,9 +72,7 @@ class GigaSpeech(object):
 
         # Download the file list
         filelist_path = self.gigaspeech_dataset_dir / 'files.yaml'
-        filelist_text = download_to_buffer(f'{self.gigaspeech_release_url}/files.yaml').decode()
-        with open(filelist_path, 'w') as f:
-            f.write(filelist_text)
+        download(filelist_path, f'{self.gigaspeech_release_url}/files.yaml')
         with open(filelist_path) as f:
             aes_list = yaml.load(f, Loader=yaml.FullLoader)
 
@@ -123,9 +121,7 @@ class GigaSpeech(object):
             local_obj.parent.mkdir(parents=True, exist_ok=True)
             remote_obj_for_print = re.sub(r'//.*@', '//', remote_obj)
             print(f'Downloading from {remote_obj_for_print}')
-            data = download_to_buffer(remote_obj)
-            with open(local_obj, 'wb') as f:
-                f.write(data)
+            download(local_obj, remote_obj)
 
             # Check md5 of the written file
             with open(local_obj, 'rb') as f:
