@@ -1,12 +1,18 @@
-import urllib3
 import ftplib
 from urllib.parse import urlparse
+from urllib.request import urlopen
 
 
 def download_from_http_to_buffer(url):
-    http = urllib3.PoolManager()
-    response = http.request('GET', url)
-    return response.data
+    response = urlopen(url)
+    chunk_size = 16 * 1024 * 1024
+    data = []
+    while True:
+        chunk = response.read(chunk_size)
+        if not chunk:
+            break
+        data.append(chunk)
+    return b''.join(data)
 
 
 def download_from_ftp_to_buffer(host, remote_path, username=None, password=None, port=None):

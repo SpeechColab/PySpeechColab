@@ -16,7 +16,6 @@ setup(
     packages=find_packages(),
     install_requires=[
         "ijson",
-        "urllib3",
         "pyyaml",
         "pycryptodome"
     ],
