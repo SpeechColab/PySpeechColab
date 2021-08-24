@@ -1,5 +1,6 @@
 import hashlib
 import io
+import re
 import tarfile
 import time
 import zlib
@@ -7,14 +8,15 @@ from hashlib import pbkdf2_hmac
 from pathlib import Path
 
 import ijson
-import urllib3
 import yaml
 from Crypto.Cipher import AES
+
+from speechcolab.utils.download import download
 
 url_of_host = {
     'oss': 'oss://speechcolab/GigaSpeech/release/GigaSpeech',
     'tsinghua': 'http://aidata.tsinghua-ieit.com/GigaSpeech',
-    'speechocean': 'ftp://124.207.81.184/GigaSpeech',
+    'speechocean': 'ftp://GigaSpeech:<PASSWORD>@124.207.81.184:21/GigaSpeech',
     'magicdata': 'https://freedata.oss-cn-beijing.aliyuncs.com/magichub/GigaSpeech'
 }
 
@@ -27,6 +29,7 @@ class GigaSpeech(object):
         self.json_path = self.gigaspeech_dataset_dir / 'GigaSpeech.json'
         self.gigaspeech_release_url = ''
         self.password = ''
+        self.audios_in_subset = set()
 
     def download(
             self,
@@ -48,7 +51,7 @@ class GigaSpeech(object):
 
         if host not in url_of_host:
             raise NotImplementedError(f'Unknown host: {host}')
-        self.gigaspeech_release_url = url_of_host[host]
+        self.gigaspeech_release_url = url_of_host[host].replace('<PASSWORD>', password.replace('/', '<SLASH>'))
 
         if self.gigaspeech_release_url.startswith('oss:'):
             raise NotImplementedError('For downloading from OSS, please use: '
@@ -57,13 +60,11 @@ class GigaSpeech(object):
         self.password = password
 
         # User agreement
-        http = urllib3.PoolManager()
-        response = http.request('GET', f'{self.gigaspeech_release_url}/TERMS_OF_ACCESS')
-        access_term_text = response.data.decode()
         self.gigaspeech_dataset_dir.mkdir(parents=True, exist_ok=True)
-        with open(self.gigaspeech_dataset_dir / 'TERMS_OF_ACCESS', 'w') as f:
-            f.write(access_term_text)
-            print(access_term_text)
+        access_term_path = self.gigaspeech_dataset_dir / 'TERMS_OF_ACCESS'
+        download(access_term_path, f'{self.gigaspeech_release_url}/TERMS_OF_ACCESS')
+        with open(access_term_path, 'r') as f:
+            print(f.read())
         print('GigaSpeech downloading will start in 5 seconds')
         for t in range(5, 0, -1):
             print(t)
@@ -71,20 +72,25 @@ class GigaSpeech(object):
 
         # Download the file list
         filelist_path = self.gigaspeech_dataset_dir / 'files.yaml'
-        filelist_remote_url = f'{self.gigaspeech_release_url}/files.yaml'
-        response = http.request('GET', filelist_remote_url)
-        with open(filelist_path, 'w') as f:
-            f.write(response.data.decode())
+        download(filelist_path, f'{self.gigaspeech_release_url}/files.yaml')
         with open(filelist_path) as f:
             aes_list = yaml.load(f, Loader=yaml.FullLoader)
 
         def prepare_objects_from_release(category):
             assert category in aes_list, f'No entry for {category} found in files.yaml'
             for path in aes_list[category]:
+                if path.startswith('audio') and re.sub(r'\.tgz.*', '', path) not in self.audios_in_subset:
+                    continue
                 self.download_and_process_object_from_release(aes_list[category][path], path)
 
         # Download metadata
         prepare_objects_from_release('metadata')
+
+        # Decide which audios need to be downloaded
+        with open(self.json_path, 'rb') as f:
+            for audio in ijson.items(f, 'audios.item'):
+                if subset in audio['subsets']:
+                    self.audios_in_subset.add(f'{Path(audio["path"]).parent}')
 
         # Download audio
         for audio_source in ('youtube', 'podcast', 'audiobook'):
@@ -113,12 +119,9 @@ class GigaSpeech(object):
         retry_count = 3
         while need_download and retry_count > 0:
             local_obj.parent.mkdir(parents=True, exist_ok=True)
-            http = urllib3.PoolManager()
-            print(f'Downloading from {remote_obj}')
-            response = http.request('GET', remote_obj)
-            data = response.data
-            with open(local_obj, 'wb') as f:
-                f.write(data)
+            remote_obj_for_print = re.sub(r'//.*@', '//', remote_obj)
+            print(f'Downloading from {remote_obj_for_print}')
+            download(local_obj, remote_obj)
 
             # Check md5 of the written file
             with open(local_obj, 'rb') as f:
