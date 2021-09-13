@@ -125,7 +125,7 @@ class GigaSpeech(object):
             local_obj.parent.mkdir(parents=True, exist_ok=True)
             remote_obj_for_print = re.sub(r'//.*@', '//', remote_obj)
             print(f'Downloading from {remote_obj_for_print}')
-            download(local_obj, remote_obj)
+            download(local_obj, remote_obj, show_progress_bar=True)
 
             # Check md5 of the written file
             with open(local_obj, 'rb') as f:

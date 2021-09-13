@@ -17,7 +17,8 @@ setup(
     install_requires=[
         "ijson",
         "pyyaml",
-        "pycryptodome"
+        "pycryptodome",
+        "tqdm"
     ],
     classifiers=[
         "Development Status :: 3 - Alpha",
