@@ -1,4 +1,5 @@
 import ftplib
+import ssl
 from urllib.parse import urlparse
 from urllib.request import urlopen
 
@@ -31,6 +32,7 @@ def download_from_ftp(local_filename, host, remote_path, username=None, password
 
 
 def download(local_filename, url):
+    ssl._create_default_https_context = ssl._create_unverified_context
     if url.startswith('http://') or url.startswith('https://'):
         return download_from_http(local_filename, url)
     elif url.startswith('ftp://'):

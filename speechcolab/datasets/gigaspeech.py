@@ -63,14 +63,17 @@ class GigaSpeech(object):
         self.gigaspeech_dataset_dir.mkdir(parents=True, exist_ok=True)
         access_term_path = self.gigaspeech_dataset_dir / 'TERMS_OF_ACCESS'
         download(access_term_path, f'{self.gigaspeech_release_url}/TERMS_OF_ACCESS')
+        print('\033[0;32m' + '\nBY PROCEEDING YOU AGREE TO THE FOLLOWING GIGASPEECH TERMS OF ACCESS:\n')
         with open(access_term_path, 'r') as f:
             print(f.read())
+        print('\033[0m')  # clear the color
         print('GigaSpeech downloading will start in 5 seconds')
         for t in range(5, 0, -1):
             print(t)
             time.sleep(1)
 
         # Download the file list
+        print('Start to download files.yaml')
         filelist_path = self.gigaspeech_dataset_dir / 'files.yaml'
         download(filelist_path, f'{self.gigaspeech_release_url}/files.yaml')
         with open(filelist_path) as f:
@@ -84,6 +87,7 @@ class GigaSpeech(object):
                 self.download_and_process_object_from_release(aes_list[category][path], path)
 
         # Download metadata
+        print('Start to download GigaSpeech metadata')
         prepare_objects_from_release('metadata')
 
         # Decide which audios need to be downloaded
