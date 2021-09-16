@@ -159,8 +159,12 @@ class GigaSpeech(object):
         elif local_obj.suffixes[-2:] == ['.gz', '.aes']:
             # encripted-gziped object represents a regular GigaSpeech file
             out_path = local_obj.parent / Path(local_obj.stem.strip('.gz.aes'))
+            z = zlib.decompressobj(zlib.MAX_WBITS | 16)
             with open(out_path, 'wb') as f:
-                f.write(zlib.decompress(data_dec, zlib.MAX_WBITS | 16))
+                block_size = 40960
+                f.write(z.decompress(data_dec, block_size))
+                while not z.eof:
+                    f.write(z.decompress(z.unconsumed_tail, block_size))
         else:
             # keep the object as it is
             pass
