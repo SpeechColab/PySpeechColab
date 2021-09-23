@@ -1,4 +1,5 @@
 import ftplib
+import hashlib
 import ssl
 from tqdm import tqdm
 from urllib.parse import urlparse
@@ -47,3 +48,14 @@ def download(local_filename, url, show_progress_bar=False):
                                  url_info.password.replace('<SLASH>', '/'), url_info.port)
     else:
         raise ValueError('URL must starts with "http://", "https://", or "ftp://"')
+
+
+def file_md5(filename, chunk_size=40960):
+    filehash = hashlib.md5()
+    with open(filename, 'rb') as f:
+        while True:
+            chunk = f.read(chunk_size)
+            if not chunk:
+                break
+            filehash.update(chunk)
+    return filehash.hexdigest()
