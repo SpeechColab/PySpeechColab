@@ -1,4 +1,3 @@
-import hashlib
 import io
 import re
 import tarfile
@@ -11,7 +10,7 @@ import ijson
 import yaml
 from Crypto.Cipher import AES
 
-from speechcolab.utils.download import download
+from speechcolab.utils.download import download, file_md5
 
 url_of_host = {
     'oss': 'oss://speechcolab/GigaSpeech/release/GigaSpeech',
@@ -30,6 +29,7 @@ class GigaSpeech(object):
         self.gigaspeech_release_url = ''
         self.password = ''
         self.audios_in_subset = set()
+        self.chunk_size = 40960
 
     def download(
             self,
@@ -63,14 +63,17 @@ class GigaSpeech(object):
         self.gigaspeech_dataset_dir.mkdir(parents=True, exist_ok=True)
         access_term_path = self.gigaspeech_dataset_dir / 'TERMS_OF_ACCESS'
         download(access_term_path, f'{self.gigaspeech_release_url}/TERMS_OF_ACCESS')
+        print('\033[0;32m' + '\nBY PROCEEDING YOU AGREE TO THE FOLLOWING GIGASPEECH TERMS OF ACCESS:\n')
         with open(access_term_path, 'r') as f:
             print(f.read())
+        print('\033[0m')  # clear the color
         print('GigaSpeech downloading will start in 5 seconds')
         for t in range(5, 0, -1):
             print(t)
             time.sleep(1)
 
         # Download the file list
+        print('Start to download files.yaml')
         filelist_path = self.gigaspeech_dataset_dir / 'files.yaml'
         download(filelist_path, f'{self.gigaspeech_release_url}/files.yaml')
         with open(filelist_path) as f:
@@ -84,6 +87,7 @@ class GigaSpeech(object):
                 self.download_and_process_object_from_release(aes_list[category][path], path)
 
         # Download metadata
+        print('Start to download GigaSpeech metadata')
         prepare_objects_from_release('metadata')
 
         # Decide which audios need to be downloaded
@@ -105,12 +109,8 @@ class GigaSpeech(object):
         remote_obj = f'{self.gigaspeech_release_url}/{obj}'
         local_obj = self.gigaspeech_dataset_dir / obj
         need_download = True
-        data = ''
         if local_obj.exists():
-            with open(local_obj, 'rb') as f:
-                data = f.read()
-                local_md5 = hashlib.md5(data).hexdigest()
-            if local_md5 == remote_md5:
+            if file_md5(local_obj) == remote_md5:
                 print(f'Skipping {local_obj}, successfully retrieved already.')
                 need_download = False
             else:
@@ -121,42 +121,50 @@ class GigaSpeech(object):
             local_obj.parent.mkdir(parents=True, exist_ok=True)
             remote_obj_for_print = re.sub(r'//.*@', '//', remote_obj)
             print(f'Downloading from {remote_obj_for_print}')
-            download(local_obj, remote_obj)
+            download(local_obj, remote_obj, show_progress_bar=True)
 
             # Check md5 of the written file
-            with open(local_obj, 'rb') as f:
-                data = f.read()
-                local_md5 = hashlib.md5(data).hexdigest()
-                if local_md5 == remote_md5:
-                    print(f'Successfully verified md5 for {local_obj}')
-                    need_download = False
-                else:
-                    print(f'$local_version expects md5=$md5, got $local_md5, try downloading')
-                    retry_count -= 1
+            if file_md5(local_obj) == remote_md5:
+                print(f'Successfully verified md5 for {local_obj}')
+                need_download = False
+            else:
+                print(f'$local_version expects md5=$md5, got $local_md5, try downloading')
+                retry_count -= 1
             if retry_count <= 0:
                 raise ConnectionError(f'Can not retrive the correct file {remote_obj} with md5 {remote_md5}')
 
-        # Decrypt
-        bs = AES.block_size
-        salt = data[:bs][len('Salted__'):]
-        key_length = 32
-        d = pbkdf2_hmac('sha256', self.password.encode(), salt, 10000, key_length + bs)
-        key, iv = d[:key_length], d[key_length:key_length + bs]
-        cipher = AES.new(key, AES.MODE_CBC, iv)
-        data_dec = cipher.decrypt(data[bs:])
+        # Decrypt and save to file
+        local_obj_dec = local_obj.parent / Path(local_obj.stem.strip('.aes'))
+        with open(local_obj, 'rb') as f_in, open(local_obj_dec, 'wb') as f_out:
+            bs = AES.block_size
+            salt = f_in.read(bs)[len('Salted__'):]
+            key_length = 32
+            d = pbkdf2_hmac('sha256', self.password.encode(), salt, 10000, key_length + bs)
+            key, iv = d[:key_length], d[key_length:key_length + bs]
+            cipher = AES.new(key, AES.MODE_CBC, iv)
+            while True:
+                chunk = f_in.read(self.chunk_size)
+                if not chunk:
+                    break
+                f_out.write(cipher.decrypt(chunk))
 
         # Write the decompressed files
-        if local_obj.suffixes == ['.tgz', '.aes']:
+        if local_obj_dec.suffix == '.tgz':
             # encrypted-gziped-tarball contains contents of a GigaSpeech sub-directory
-            subdir = local_obj.parent / Path(local_obj.stem.strip('.tgz'))
+            subdir = local_obj_dec.parent / Path(local_obj_dec.stem.strip('.tgz'))
             subdir.mkdir(parents=True, exist_ok=True)
-            with tarfile.open(fileobj=io.BytesIO(data_dec), mode='r') as tar:
+            with tarfile.open(local_obj_dec) as tar:
                 tar.extractall(path=subdir)
-        elif local_obj.suffixes[-2:] == ['.gz', '.aes']:
+        elif local_obj_dec.suffix == '.gz':
             # encripted-gziped object represents a regular GigaSpeech file
-            out_path = local_obj.parent / Path(local_obj.stem.strip('.gz.aes'))
-            with open(out_path, 'wb') as f:
-                f.write(zlib.decompress(data_dec, zlib.MAX_WBITS | 16))
+            out_path = local_obj_dec.parent / Path(local_obj_dec.stem.strip('.gz'))
+            z = zlib.decompressobj(zlib.MAX_WBITS | 16)
+            with open(local_obj_dec, 'rb') as f_in, open(out_path, 'wb') as f_out:
+                while True:
+                    chunk = f_in.read(self.chunk_size)
+                    if not chunk:
+                        break
+                    f_out.write(z.decompress(chunk))
         else:
             # keep the object as it is
             pass
