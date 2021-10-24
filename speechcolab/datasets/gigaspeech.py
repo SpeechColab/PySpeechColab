@@ -1,8 +1,7 @@
-import io
+import os
 import re
 import tarfile
 import time
-import zlib
 from hashlib import pbkdf2_hmac
 from pathlib import Path
 
@@ -157,14 +156,7 @@ class GigaSpeech(object):
                 tar.extractall(path=subdir)
         elif local_obj_dec.suffix == '.gz':
             # encripted-gziped object represents a regular GigaSpeech file
-            out_path = local_obj_dec.parent / Path(local_obj_dec.stem.strip('.gz'))
-            z = zlib.decompressobj(zlib.MAX_WBITS | 16)
-            with open(local_obj_dec, 'rb') as f_in, open(out_path, 'wb') as f_out:
-                while True:
-                    chunk = f_in.read(self.chunk_size)
-                    if not chunk:
-                        break
-                    f_out.write(z.decompress(chunk))
+            os.system(f'gunzip {local_obj_dec}')
         else:
             # keep the object as it is
             pass
