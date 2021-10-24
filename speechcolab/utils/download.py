@@ -59,3 +59,7 @@ def file_md5(filename, chunk_size=40960):
                 break
             filehash.update(chunk)
     return filehash.hexdigest()
+
+
+def string_md5(text):
+    return hashlib.md5(text.encode()).hexdigest()

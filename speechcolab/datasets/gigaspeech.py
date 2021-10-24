@@ -9,7 +9,7 @@ import ijson
 import yaml
 from Crypto.Cipher import AES
 
-from speechcolab.utils.download import download, file_md5
+from speechcolab.utils.download import download, file_md5, string_md5
 
 url_of_host = {
     'oss': 'oss://speechcolab/GigaSpeech/release/GigaSpeech',
@@ -56,6 +56,7 @@ class GigaSpeech(object):
             raise NotImplementedError('For downloading from OSS, please use: '
                                       'github.com/SpeechColab/GigaSpeech/blob/main/utils/download_gigaspeech.sh')
 
+        assert string_md5(password) == 'a2932ace6e301f5ae6c48c13007a6b32', f'Invalid Password.'
         self.password = password
 
         # User agreement
